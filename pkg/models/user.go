@@ -1,17 +1,22 @@
 package models
 
 import (
+	"log"
+	"time"
+
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"log"
 )
 
 type User struct {
 	gorm.Model
-	Name     string `json:"name"`
-	Username string `json:"username" gorm:"unique"`
-	Email    string `json:"email" gorm:"unique"`
-	Password string `json:"password"`
+	Name         string `json:"name"`
+	Username     string `json:"username" gorm:"unique"`
+	Email        string `json:"email" gorm:"unique"`
+	Password     string `json:"password"`
+	CreatedAt    time.Time
+	PasswordHash string
+	RememberHash string
 }
 
 // CheckPassword gets plain password as input and checks if it matches the hashed password in the database.

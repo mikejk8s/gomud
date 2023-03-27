@@ -1,4 +1,4 @@
-package userdb //TODO: Refactor this and mysql package to not collide
+package userdb
 
 import (
 	"log"

@@ -4,23 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
+	"github.com/balibuild/tunnelssh"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	lm "github.com/charmbracelet/wish/logging"
 	"github.com/gliderlabs/ssh"
 	"github.com/muesli/termenv"
+	"gorm.io/gorm"
 
 	"github.com/mikejk8s/gmud/pkg/backend"
 	mn "github.com/mikejk8s/gmud/pkg/menus"
 	"github.com/mikejk8s/gmud/pkg/models"
-	sqlpkg "github.com/mikejk8s/gmud/pkg/postgrespkg"
+	postgrespkg "github.com/mikejk8s/gmud/pkg/postgrespkg"
 )
 
 const (
@@ -35,16 +34,19 @@ func passHandler(ctx ssh.Context, password string) bool {
 		return false
 	}
 
-	usersConn := sqlpkg.SqlConn{}
-	err := usersConn.GetSQLConn("users")
+	conn, err := postgrespkg.Connect()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer usersConn.Close()
+	defer conn.Close(*gorm.DB)
+
+	if err := conn.GetSQLConn("users"); err != nil {
+		log.Fatalln(err)
+	}
 
 	user := models.User{}
-	query := fmt.Sprintf("SELECT password, email, name, username from users.users where username = '%s'", ctx.User())
-	rows, err := usersConn.DB.Query(query)
+	query := fmt.Sprintf("SELECT password, email, name, username from users where username = '%s'", ctx.User())
+	rows, err := conn.DB.Raw(query).Rows()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -63,96 +65,126 @@ func passHandler(ctx ssh.Context, password string) bool {
 
 	return user.CheckPassword(password) == nil
 }
+
 func main() {
-	// This is used for switching between localhost:port to TCP_HOST:TCP_PORT etc.
-	// Lookup for a running on docker environment variable, if exists
 	tempEnvVar, ok := os.LookupEnv("RUNNING_ON_DOCKER")
 	if ok {
-		// set running on docker to true
 		RunningOnDocker = tempEnvVar == "true"
-		// Use mysqlpkg's RunningOnDocker variable that is set on vars.go if you want to use this bool in other code.
-		sqlpkg.RunningOnDocker = RunningOnDocker
-		log.Println("Running on docker is set to", sqlpkg.RunningOnDocker)
+		RunningOnDocker = RunningOnDocker
+		log.Println("Running on docker is set to", RunningOnDocker)
 	} else {
-		sqlpkg.RunningOnDocker = false
+		//  set default
+		RunningOnDocker = true
 	}
-	// I will try to set everything from one function so future contributors can change variables
-	// from one place as they run the app on their own.
-	//
-	// Change the mysqlpkg variables if we are running on docker
+
 	if RunningOnDocker {
-		sqlpkg.Username = os.Getenv("POSTGRES_USER")
-		sqlpkg.Password = os.Getenv("POSTGRESQL_PASSWORD")
-		sqlpkg.Hostname = os.Getenv("POSTGRES_HOST")
+		postgrespkg.POSTGRES_USER = os.Getenv("POSTGRES_USER")
+		postgrespkg.POSTGRES_PASSWORD = os.Getenv("POSTGRES_PASSWORD")
+		postgrespkg.POSTGRESS_HOST = os.Getenv("POSTGRES_HOST")
 	} else {
-		// If we are not running on docker, please change these variables as you desire.
-		sqlpkg.Username = "gmud"
-		sqlpkg.Password = "gmud"
-		sqlpkg.Hostname = "(127.0.0.1:5432)"
+		postgrespkg.POSTGRES_USER = "gmud"
+		postgrespkg.POSTGRES_PASSWORD = "gmud"
+		postgrespkg.POSTGRESS_HOST = "127.0.0.1:5432"
 	}
-	// Run a websocket server to communicate between players, fiddle with change websocket port if you want.
 	go backend.StartWSServer()
-	// Fire the webpage server that will handle the signup page.
-	//
-	// This function will use WEBPAGE_HOST and WEBPAGE_ENV variables that is submitted on docker-compose.yml
-	//
-	// Or localhost:6969 if it's not running on docker. You can change it by changing 6969 below simply.
 	go backend.StartWebPageBackend(RunningOnDocker, 6969)
-	// Create users schema and users table, migrate if possible.
-	go sqlpkg.Migration()
-	// Connect to mariadb database and create characters schema + character tables if they don't exist
-	initialTableCreation := new(sqlpkg.SqlConn)
-	err := initialTableCreation.GetSQLConn("characters")
+
+	initialTableCreation, err := postgrespkg.Connect()
 	if err != nil {
 		log.Println(err)
 	}
+	defer initialTableCreation.Close()
+
+	characterDB, err := postgrespkg.Connect()
+	if err != nil {
+		log.Println(err)
+	}
+	defer characterDB.Close()
+
+	usersDB, err := postgrespkg.Connect()
+	if err != nil {
+		log.Println(err)
+	}
+	defer usersDB.Close()
+
 	// Characters table creation.
 	go func() {
-		err := initialTableCreation.CreateCharacterTable()
+		err := postgrespkg.CreateCharacterTable(characterDB)
 		if err != nil {
 			panic(err)
-		} else {
-			initialTableCreation.Close()
 		}
 	}()
-	// Users table creation.
+
+	// Users table creation and migration.
 	go func() {
-		initialUsersCreation := sqlpkg.SqlConn{}
-		err := initialUsersCreation.GetSQLConn("")
+		err := postgrespkg.CreateUsersTable(usersDB)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		initialUsersCreation.CreateUsersTable()
-		initialUsersCreation.Close()
+
+		err = postgrespkg.UsersMigration(usersDB)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		defer usersDB.DB.Close()
 	}()
-	// Initialize the SSH server
-	s, err := wish.NewServer(
-		wish.WithIdleTimeout(30*time.Minute), // 30-minute idle timer, in case if someone forgets to log out.
-		wish.WithPasswordAuth(passHandler),
-		wish.WithAddress(fmt.Sprintf("%s:%d", Host, Port)),
-		wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
-			return true
-		}),
-		wish.WithMiddleware(
-			lm.Middleware(),
-			loginBubbleteaMiddleware(),
-		),
-	)
-	if err != nil {
+
+
+	// Users table creation and migration.
+	go func() {
+		err := postgrespkg.CreateUsersTable(usersDB)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		err = postgrespkg.UsersMigration(usersDB)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		defer usersDB.Close()
+	}()
+
+
+
+
+// Define the default shell
+const DefaultShell = "bash"
+
+// Initialize the SSH server
+s, err := wish.NewServer(
+    wish.WithIdleTimeout(30*time.Minute), // 30-minute idle timer, in case someone forgets to log out.
+    wish.WithPasswordAuth(passHandler),
+    wish.WithAddress(fmt.Sprintf("%s:%d", Host, Port)),
+    wish.WithPublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+        return true
+    }),
+    wish.WithMiddleware(
+        lm.Middleware(),
+        loginBubbleteaMiddleware(),
+    ),
+)
+
+if err != nil {
+    log.Fatalln(err)
+}
+
+s.Handle(DefaultShell, func(sess wish.Session) {
+    user, err := getUserFromDB(sess.Context(), usersDB)
+    if err != nil {
+        log.Fatalln(err)
+    }
+    // Do something with the user struct here.
+})
+
+	log.Printf("Starting SSH server on %s:%d...\n", Host, Port)
+	defer s.Shutdown(context.Background())
+	if err := s.ListenAndServe(); err != nil {
 		log.Fatalln(err)
 	}
-	s.ConnectionFailedCallback = func(conn net.Conn, err error) {
-		log.Println("Connection failed:", err)
-	}
-	done := make(chan os.Signal, 0)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	log.Printf("Starting SSH server on %s:%d", Host, Port)
-	go func() {
-		err = s.ListenAndServe()
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}()
+
+	done := make(chan os.Signal, 1)
 	<-done
 	log.Println("Stopping SSH server")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -161,6 +193,46 @@ func main() {
 		log.Fatalln(err)
 	}
 }
+
+
+
+
+
+
+func getUserFromDB(ctx ssh.Context) (*models.User, error) {
+    usersConn, err := postgrespkg.Connect()
+    if err != nil {
+        return nil, err
+    }
+    defer usersConn.DB.Close()
+
+    user := &models.User{}
+    query := fmt.Sprintf("SELECT password, email, name, username from users where username = '%s'", ctx.User())
+    rows, err := usersConn.DB.Query(query)
+    if err != nil {
+        return nil, err
+    }
+    defer func() {
+        rows.Close()
+        postgrespkg.Close()
+    }()
+
+    for rows.Next() {
+        err = rows.Scan(&user.Password, &user.Email, &user.Name, &user.Username)
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    return user, nil
+}
+
+
+
+
+
+
+
 
 func loginBubbleteaMiddleware() wish.Middleware {
 	login := func(m tea.Model, opts ...tea.ProgramOption) *tea.Program {
