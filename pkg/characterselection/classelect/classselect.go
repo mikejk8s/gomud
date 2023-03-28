@@ -10,11 +10,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/mikejk8s/gmud/pkg/models"
 	"github.com/mikejk8s/gmud/pkg/postgrespkg"
 	"github.com/mikejk8s/gmud/pkg/zones/tutorial"
@@ -48,8 +49,8 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	fn := itemStyle.Render
 	if index == m.Index() {
-		fn = func(s string) string {
-			return selectedItemStyle.Render("> " + s)
+		fn = func(s ...string) string {
+			return selectedItemStyle.Render("> " + strings.Join(s, ""))
 		}
 	}
 
@@ -124,11 +125,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// ID and CreatedAt is generated in charselection.go when race is picked in charselection.go model
 				// Level is set to 1, alive is set to true when race is picked in charselection.go model
 				//
-				err := m.DBConnection.GetSQLConn("characters")
+				err := m.DBConnection.ConnectSQLToSchema("characters")
 				if err != nil {
 					log.Println(err)
 				}
-				m.DBConnection.AddCharacter(*m.character)
+				m.DBConnection.CreateNewCharacter(m.character)
 				m.DBConnection.Close()
 				return tutorial.InitialModel(m.character, m.SSHSession), nil
 			}

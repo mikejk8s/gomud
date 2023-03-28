@@ -3,44 +3,39 @@ package postgrespkg
 import (
 	"fmt"
 	"os"
-	"log"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-
-type Conn struct {
-	DB *gorm.DB
-}
-
-func Connect() (*gorm.DB, error) {
+func Connect(dbName string) (*SqlConn, error) {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
-		os.Getenv("POSTGRES_HOST"), os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"), os.Getenv("POSTGRES_PORT"), os.Getenv("POSTGRES_SSLMODE"),
-		os.Getenv("POSTGRES_TIMEZONE"),
+		POSTGRESS_HOST, POSTGRES_USER, POSTGRES_PASSWORD,
+		dbName, POSTGRES_PORT, POSTGRES_SSLMODE,
+		os.Getenv("TZ"),
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
-
-	return db, nil
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	var sqlUtil = new(SqlConn)
+	sqlUtil = &SqlConn{DB: db, SqlDB: sqlDB}
+	return sqlUtil, nil
 }
 
-func (conn *Conn) GetSQLConn(schemaName string) error {
-	db := conn.DB.Exec(fmt.Sprintf("SET search_path TO %s", schemaName))
+func (s *SqlConn) ConnectSQLToSchema(schemaName string) error {
+	db := s.DB.Exec(fmt.Sprintf("SET search_path TO %s", schemaName))
 	if db.Error != nil {
 		return db.Error
 	}
 	return nil
 }
 
-func Close(db *gorm.DB) {
-	dbConn, err := db.DB()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	dbConn.Close()
+func (s *SqlConn) Close() error {
+	return s.SqlDB.Close()
 }

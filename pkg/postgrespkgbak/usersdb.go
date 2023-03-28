@@ -11,15 +11,14 @@ import (
 )
 
 func CreateNewUser(db *gorm.DB, userInfo models.User) error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInfo.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInfo.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	user := &models.User{
 		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 		Name:         userInfo.Name,
-		Username:     userInfo.Username,
-		Email:        userInfo.Email,
 		PasswordHash: string(hashedPassword),
 		RememberHash: uuid.New().String(),
 	}

@@ -6,14 +6,15 @@ services:
     volumes:
       - 'db_data:/bitnami/postgresql'
       - './sql/initdecoy.sql:/initdb/init.sql'
-    restart: on-failure
+    restart: "no"
+    tty: true
     env_file:
       - prod.env
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB1=${POSTGRES_DB1}
-      - POSTGRES_DB2=${POSTGRES_DB2}
+      - POSTGRES_USERS_DB=${POSTGRES_USERS_DB}
+      - POSTGRES_CHARACTERS_DB=${POSTGRES_CHARACTERS_DB}
       - POSTGRES_INITDB_ARGS=--username=postgres --pwfile=<(echo "$$POSTGRES_PASSWORD") -E UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
       - POSTGRES_INITDB_WALDIR=/bitnami/postgresql/wal
       - POSTGRES_INITDB_XLOGDIR=/bitnami/postgresql/xlog
@@ -43,8 +44,10 @@ services:
       - WAIT_HOST_CONNECT_TIMEOUT=30
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB1=${POSTGRES_DB1}
-      - POSTGRES_DB2=${POSTGRES_DB2}
+      - POSTGRES_USERS_DB=${POSTGRES_USERS_DB}
+      - POSTGRES_CHARACTERS_DB=${POSTGRES_CHARACTERS_DB}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE}
+      - POSTGRES_PORT=5432
       - PGHOST=postgres
       - PGPORT=5432
       - RUNNING_ON_DOCKER=true

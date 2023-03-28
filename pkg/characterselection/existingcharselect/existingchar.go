@@ -7,8 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/gliderlabs/ssh"
-	"github.com/mikejk8s/gmud/logger"
+	"github.com/charmbracelet/ssh"
 	"github.com/mikejk8s/gmud/pkg/models"
 	"github.com/mikejk8s/gmud/pkg/postgrespkg"
 	"github.com/mikejk8s/gmud/pkg/zones/tutorial"
@@ -54,7 +53,7 @@ type model struct {
 
 func InitialModel(accOwner string, SSHSess ssh.Session, dbConn *postgrespkg.SqlConn) model {
 	// Get characters associated with the account
-	tempCharacterData, err := GetCharacterDB(dbConn, accOwner)
+	tempCharacterData, err := dbConn.GetCharacterList(accOwner)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -126,18 +125,4 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m model) View() string {
 	return m.choiceList.View()
-}
-
-// GetCharacterDB returns an array of characters associated with the account accOwner.
-func GetCharacterDB(dbConn *postgrespkg.SqlConn, accOwner string) ([]*models.Character, error) {
-	cDBLogger := logger.GetNewLogger()
-	err := cDBLogger.AssignOutput("characterDB", "./logs/characterDBconn")
-	if err != nil {
-		log.Println(err)
-	}
-	if err != nil {
-		cDBLogger.LogUtil.Errorf("Error %s connecting to characterDB during fetching the %s accounts characters: ", err, accOwner)
-		panic(err.Error())
-	}
-	return dbConn.GetCharactersByOwner(accOwner)
 }
