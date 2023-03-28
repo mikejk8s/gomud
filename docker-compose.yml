@@ -6,20 +6,20 @@ services:
     volumes:
       - 'db_data:/bitnami/postgresql'
       - './sql/initdecoy.sql:/initdb/init.sql'
-    restart: "no"
+    restart: always
     tty: true
     env_file:
       - prod.env
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_USERS_DB=${POSTGRES_USERS_DB}
-      - POSTGRES_CHARACTERS_DB=${POSTGRES_CHARACTERS_DB}
-      - POSTGRES_INITDB_ARGS=--username=postgres --pwfile=<(echo "$$POSTGRES_PASSWORD") -E UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
-      - POSTGRES_INITDB_WALDIR=/bitnami/postgresql/wal
-      - POSTGRES_INITDB_XLOGDIR=/bitnami/postgresql/xlog
-      - POSTGRES_INITDB_EXTRA_FLAGS=-U postgres --pwfile=<(echo "$$POSTGRES_PASSWORD") --auth=trust
-      - POSTGRES_INITDB_SETROLE=gmud
+    # environment:
+    #   - POSTGRES_USER=${POSTGRES_USER}
+    #   - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    #   - POSTGRES_USERS_DB=${POSTGRES_USERS_DB}
+    #   - POSTGRES_CHARACTERS_DB=${POSTGRES_CHARACTERS_DB}
+    #   - POSTGRES_INITDB_ARGS=--username=postgres --pwfile=<(echo "$$POSTGRES_PASSWORD") -E UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
+    #   - POSTGRES_INITDB_WALDIR=/bitnami/postgresql/wal
+    #   - POSTGRES_INITDB_XLOGDIR=/bitnami/postgresql/xlog
+    #   - POSTGRES_INITDB_EXTRA_FLAGS=-U postgres --pwfile=<(echo "$$POSTGRES_PASSWORD") --auth=trust
+    #   - POSTGRES_INITDB_SETROLE=gmud
     networks:
       - dev
     healthcheck:
