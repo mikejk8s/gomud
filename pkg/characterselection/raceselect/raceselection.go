@@ -2,16 +2,18 @@ package raceselect
 
 import (
 	"fmt"
+	"io"
+	"math/rand"
+	"strings"
+	"time"
+
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/mikejk8s/gmud/pkg/characterselection/nameselect"
 	"github.com/mikejk8s/gmud/pkg/models"
 	"github.com/mikejk8s/gmud/pkg/postgrespkg"
-	"io"
-	"math/rand"
-	"time"
 )
 
 // CHARACTER SELECTION MODELS
@@ -44,8 +46,8 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	fn := itemStyle.Render
 	if index == m.Index() {
-		fn = func(s string) string {
-			return selectedItemStyle.Render("> " + s)
+		fn = func(s ...string) string {
+			return selectedItemStyle.Render("> " + strings.Join(s, ""))
 		}
 	}
 
@@ -108,7 +110,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if ok {
 				// Generate a random 5 digit string for ID
 				rand.Seed(time.Now().UnixNano())
-				id := rand.Intn(99999)
+				id := rand.Uint64()
 				// Create a new character struct
 				newCharacter := models.Character{
 					Race:           string(raceCh), // current selection

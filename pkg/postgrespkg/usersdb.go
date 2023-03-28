@@ -1,37 +1,45 @@
+package postgrespkg
+
 import (
-"time"
+	"log"
+	"time"
 
-"gorm.io/gorm"
-
-"github.com/mikejk8s/gmud/pkg/models"
+	"github.com/mikejk8s/gmud/logger"
+	"github.com/mikejk8s/gmud/pkg/models"
 )
 
-type SqlConn struct {
-DB *gorm.DB
+func (s *SqlConn) CreateNewUser(name string, password string) error {
+	user := &models.User{
+		CreatedAt:    time.Now(),
+		Name:         name,
+		PasswordHash: password,
+		RememberHash: "",
+	}
+
+	if err := s.DB.Create(user).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *SqlConn) CreateUsersTable() {
-s.DB.Exec(`CREATE TABLE IF NOT EXISTS users (
-        id              SERIAL PRIMARY KEY,
-        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at      TIMESTAMP,
-        deleted_at      TIMESTAMP,
-        name            VARCHAR(255),
-        password_hash   VARCHAR(255),
-        remember_hash   VARCHAR(255)
-    );`)
+// GetCharacterList returns an array of characters associated with the account accOwner.
+func (s *SqlConn) GetCharacterList(accOwner string) ([]*models.Character, error) {
+	cDBLogger := logger.GetNewLogger()
+	err := cDBLogger.AssignOutput("characterDB", "./logs/characterDBconn")
+	if err != nil {
+		log.Println(err)
+	}
+	if err != nil {
+		cDBLogger.LogUtil.Errorf("Error %s connecting to characterDB during fetching the %s accounts characters: ", err, accOwner)
+		panic(err.Error())
+	}
+	return s.GetCharactersByUserName(accOwner)
 }
 
-func (s *SqlConn) CreateNewUser(userInfo LoginReq) error {
-user := &models.User{
-CreatedAt:    time.Now(),
-Name:         userInfo.Name,
-PasswordHash: userInfo.Password,
-RememberHash: "",
-}
-
-if err := s.DB.Create(user).Error; err != nil {
-return err
-}
-return nil
+func (s *SqlConn) GetCharactersByUserName(name string) ([]*models.Character, error) {
+	var characters []*models.Character
+	if err := s.DB.Where("characterowner = ?", name).Find(&characters).Error; err != nil {
+		return nil, err
+	}
+	return characters, nil
 }

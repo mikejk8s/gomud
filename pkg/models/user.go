@@ -9,12 +9,11 @@ import (
 )
 
 type User struct {
-	gorm.Model
-	Name         string `json:"name"`
-	Username     string `json:"username" gorm:"unique"`
-	Email        string `json:"email" gorm:"unique"`
-	Password     string `json:"password"`
+	ID           uint64 `gorm:"primaryKey"`
 	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    gorm.DeletedAt `gorm:"index"`
+	Name         string
 	PasswordHash string
 	RememberHash string
 }
@@ -25,7 +24,7 @@ type User struct {
 //
 // If err is not nil, then the password is not correct and SSH password authentication will fail by returning false.
 func (user *User) CheckPassword(providedPassword string) error {
-	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(providedPassword))
+	err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(providedPassword))
 	if err != nil {
 		log.Println(err)
 		return err

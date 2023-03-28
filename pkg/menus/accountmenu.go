@@ -2,8 +2,9 @@ package menus
 
 import (
 	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gliderlabs/ssh"
+	"github.com/charmbracelet/ssh"
 	"github.com/mikejk8s/gmud/pkg/characterselection/existingcharselect"
 	"github.com/mikejk8s/gmud/pkg/characterselection/raceselect"
 	"github.com/mikejk8s/gmud/pkg/postgrespkg"
@@ -73,7 +74,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				// Dont forget to pass SSHSession and DBConnection, a user should occupy a single session.
 				dbConn := &postgrespkg.SqlConn{}
-				dbConn.GetSQLConn("characters")
+				dbConn.ConnectSQLToSchema("characters")
 				switch m.choices[m.cursor] {
 				case "Play with Existing Character":
 					return existingcharselect.InitialModel(m.accountOwner, m.SSHSession, dbConn), nil

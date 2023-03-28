@@ -5,12 +5,12 @@ import (
 )
 
 type Character struct {
-	Name           string    `json:"name"`
-	ID             int       `json:"id"`
-	Class          string    `json:"class"`
-	Race           string    `json:"race"`
-	Level          int       `json:"level"`
-	CreatedAt      time.Time `json:"created_at"`
-	Alive          bool      `json:"alive"`
-	CharacterOwner string    `json:"character_owner"`
+	ID             uint64 `gorm:"primaryKey" json:"id"`
+	Name           string `gorm:"uniqueIndex" json:"name"`
+	Class          string
+	Race           string `gorm:"default:'HUMAN'" json:"race"`
+	Level          int    `gorm:"default:1" json:"level"`
+	CreatedAt      time.Time
+	Alive          bool   `gorm:"default:true" json:"alive"`
+	CharacterOwner string `gorm:"default:'player'" json:"character_owner"`
 }

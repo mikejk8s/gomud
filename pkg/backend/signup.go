@@ -2,7 +2,6 @@ package backend
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -16,7 +15,7 @@ import (
 //
 // Check cmd/app/templates for the signup.html.
 func SignupFormJSONBinding(c *gin.Context) {
-	var loginReq = new(postgrespkg.LoginReq)
+	var loginReq = new(UserCredentials)
 	if err := c.BindJSON(&loginReq); err != nil {
 		fmt.Println(err)
 		c.JSON(http.StatusBadRequest, gin.H{"status": "failed"})
@@ -28,23 +27,24 @@ func SignupFormJSONBinding(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }
-func hashAndSalt(pwd []byte, minCost int, userInfo *postgrespkg.LoginReq) error {
+func hashAndSalt(pwd []byte, minCost int, userInfo *UserCredentials) error {
 	hash, err := bcrypt.GenerateFromPassword(pwd, minCost)
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 
-	dbUsers := postgrespkg.SqlConn{}
-	if err := dbUsers.GetSQLConn("users"); err != nil {
-		log.Println(err)
+	dbUsers, err := postgrespkg.Connect(postgrespkg.POSTGRES_USERS_DB)
+	if err != nil {
+		return err
+	}
+	if err := dbUsers.ConnectSQLToSchema("users"); err != nil {
 		return err
 	}
 	defer dbUsers.Close()
 
 	userInfo.Password = string(hash)
 
-	if err := dbUsers.CreateNewUser(*userInfo); err != nil {
+	if err := dbUsers.CreateNewUser(userInfo.Username, userInfo.Password); err != nil {
 		return err
 	}
 

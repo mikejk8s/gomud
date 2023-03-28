@@ -13,3 +13,8 @@ const (
 type WebsocketUtil struct {
 	Conn *websocket.Conn
 }
+
+type UserCredentials struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
